@@ -1,0 +1,33 @@
+{
+  "name": "prompt-mixer-azure-open-ai-connector",
+  "version": "1.0.0",
+  "description": "The Azure OpenAI Connector utilizes the capabilities of sophisticated AI models offered by OpenAI",
+  "type": "module",
+  "main": "main.js",
+  "scripts": {
+    "start": "node main.js",
+    "dev": "node esbuild.config.mjs",
+    "build": "tsc -noEmit -skipLibCheck && node esbuild.config.mjs production",
+    "version": "node version-bump.mjs && git add manifest.json versions.json",
+    "lint": "eslint '**/*.{js,ts}' --quiet",
+    "lint:fix": "eslint '**/*.{js,ts}' --fix",
+    "format": "prettier '**/*.{js,ts}' --write",
+    "format:check": "prettier '**/*.{js,ts}' --check"
+  },
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@azure/openai": "^1.0.0-beta.12",
+    "builtin-modules": "^4.0.0",
+    "esbuild": "^0.20.2",
+    "fs": "^0.0.1-security",
+    "openai": "^4.41.0"
+  },
+  "devDependencies": {
+    "@types/node": "^20.12.11",
+    "eslint": "^9.2.0",
+    "eslint-config-prettier": "^9.1.0",
+    "eslint-plugin-prettier": "^5.1.3",
+    "prettier": "^3.2.5"
+  }
+}
