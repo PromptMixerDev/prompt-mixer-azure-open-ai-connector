@@ -13,6 +13,8 @@ import * as fs from 'node:fs';
 import * as utils from 'node:util';
 
 import { config } from './config.js';
+import { DefaultAzureCredential } from '@azure/identity';
+import { CognitiveServicesManagementClient } from '@azure/arm-cognitiveservices';
 
 const AZURE_API_KEY = 'AZURE_API_KEY';
 const ENDPOINT = 'ENDPOINT';
@@ -40,6 +42,39 @@ interface Completion {
 }
 
 type Completions = ChatCompletions | ErrorCompletion;
+
+export interface ConnectorSetting {
+  SettingID: string;
+  Name: string;
+  Value?: string;
+  Type: string;
+}
+
+async function getModels(settings: ConnectorSetting[]): Promise<string[]> {
+  const accountName = settings.find((x) => x.SettingID === 'ACCOUNT_NAME')
+    ?.Value as string;
+  const resourceGroupName = settings.find(
+    (x) => x.SettingID === 'RESOURCE_GROUPNAME',
+  )?.Value as string;
+  const subscriptionId = settings.find((x) => x.SettingID === 'SUBSCRIPTION_ID')
+    ?.Value as string;
+
+  const credential = new DefaultAzureCredential();
+  const client = new CognitiveServicesManagementClient(
+    credential,
+    subscriptionId,
+  );
+  const deploymentNames = [];
+
+  for await (let item of client.deployments.list(
+    resourceGroupName,
+    accountName,
+  )) {
+    if (item?.name) deploymentNames.push(item.name);
+  }
+
+  return deploymentNames;
+}
 
 function isError(output: any): output is ErrorCompletion {
   return (output as ErrorCompletion).error !== undefined;
@@ -225,4 +260,4 @@ function extractImageUrls(prompt: string): string[] {
   });
 }
 
-export { main, config };
+export { main, config, getModels };

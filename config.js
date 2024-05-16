@@ -81,8 +81,20 @@ export const config = {
       type: 'string',
     },
     {
-      id: 'DEPLOYMENT_IDS',
-      name: 'Deployment IDs',
+      id: 'ACCOUNT_NAME',
+      name: 'Account Name',
+      value: '',
+      type: 'string',
+    },
+    {
+      id: 'RESOURCE_GROUPNAME',
+      name: 'Resource GroupName',
+      value: '',
+      type: 'string',
+    },
+    {
+      id: 'SUBSCRIPTION_ID',
+      name: 'Subscription Id',
       value: '',
       type: 'string',
     },
