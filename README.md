@@ -17,7 +17,9 @@ To install:
 
 ## Usage
 
-After installing and configuring your Azure API key, Endpoint and Deployment Ids you can start using any OpenAI model through the assistant panel in Prompt Mixer.
+Make sure that you log in in Azure CLI `az login`.
+
+After installing and configuring your Settings, you can start using any OpenAI model through the assistant panel in Prompt Mixer.
 
 Refer to the Azure OpenAI documentation for details on how to format prompts for each model.
 
