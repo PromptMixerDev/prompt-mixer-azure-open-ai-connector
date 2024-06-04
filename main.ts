@@ -50,7 +50,9 @@ export interface ConnectorSetting {
   Type: string;
 }
 
-async function getModels(settings: ConnectorSetting[]): Promise<string[]> {
+async function getDynamicModelList(
+  settings: ConnectorSetting[],
+): Promise<string[]> {
   const accountName = settings.find((x) => x.SettingID === 'ACCOUNT_NAME')
     ?.Value as string;
   const resourceGroupName = settings.find(
@@ -66,16 +68,22 @@ async function getModels(settings: ConnectorSetting[]): Promise<string[]> {
   );
   const deploymentNames = [];
 
-  for await (let item of client.deployments.list(
-    resourceGroupName,
-    accountName,
-  )) {
-    if (item?.name) deploymentNames.push(item.name);
-  }
+  try {
+    for await (const item of client.deployments.list(
+      resourceGroupName,
+      accountName,
+    )) {
+      if (item?.name) deploymentNames.push(item.name);
+    }
 
-  return deploymentNames;
+    return deploymentNames;
+  } catch (error) {
+    console.error('Error in getDynamicModelList function:', error);
+    return config.models;
+  }
 }
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 function isError(output: any): output is ErrorCompletion {
   return (output as ErrorCompletion).error !== undefined;
 }
@@ -108,6 +116,7 @@ const mapToResponse = (
   };
 };
 
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
 const mapErrorToCompletion = (error: any, model: string): ErrorCompletion => {
   const errorMessage = error.message || JSON.stringify(error);
 
@@ -119,11 +128,12 @@ const mapErrorToCompletion = (error: any, model: string): ErrorCompletion => {
   };
 };
 
-const logger = (object: any, description?: string): void => {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+const logger = (logBody: any, description?: string): void => {
   if (description) console.log(`${description}`);
 
   console.log(
-    utils.inspect(object, {
+    utils.inspect(logBody, {
       showHidden: false,
       depth: null,
       colors: true,
@@ -260,4 +270,4 @@ function extractImageUrls(prompt: string): string[] {
   });
 }
 
-export { main, config, getModels };
+export { main, config, getDynamicModelList };
