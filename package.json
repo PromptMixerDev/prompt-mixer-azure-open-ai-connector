@@ -1,6 +1,6 @@
 {
   "name": "prompt-mixer-azure-open-ai-connector",
-  "version": "1.0.0",
+  "version": "1.0.1",
   "description": "The Azure OpenAI Connector utilizes the capabilities of sophisticated AI models offered by OpenAI",
   "type": "module",
   "main": "main.js",
