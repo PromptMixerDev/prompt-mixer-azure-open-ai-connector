@@ -20,7 +20,7 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "@azure/arm-cognitiveservices": "^7.5.0",
+    "@azure/arm-cognitiveservices": "^7.6.0",
     "@azure/identity": "^4.5.0",
     "@azure/openai": "^2.0.0-beta.3",
     "builtin-modules": "^4.0.0",
