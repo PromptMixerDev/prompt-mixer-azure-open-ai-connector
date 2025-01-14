@@ -1,13 +1,5 @@
-import {
-  OpenAIClient,
-  AzureKeyCredential,
-  ChatCompletions,
-  ChatRequestMessageUnion,
-  ChatRequestUserMessage,
-  ChatMessageImageContentItem,
-  ChatMessageTextContentItem,
-  ChatRequestAssistantMessage,
-} from '@azure/openai';
+import { AzureOpenAI } from 'openai';
+import type { ChatCompletion, ChatCompletionMessageParam } from 'openai/resources';
 
 import * as fs from 'node:fs';
 import * as utils from 'node:util';
@@ -41,7 +33,7 @@ interface Completion {
   Error?: string;
 }
 
-type Completions = ChatCompletions | ErrorCompletion;
+type Completions = ChatCompletion | ErrorCompletion;
 
 export interface ConnectorSetting {
   SettingID: string;
@@ -69,16 +61,22 @@ async function getDynamicModelList(
   const deploymentNames = [];
 
   try {
+    logger('Fetching available models...', 'Status');
     for await (const item of client.deployments.list(
       resourceGroupName,
       accountName,
     )) {
-      if (item?.name) deploymentNames.push(item.name);
+      if (item?.name) {
+        deploymentNames.push(item.name);
+        logger(`Found model deployment: ${item.name}`, 'Status');
+      }
     }
 
+    logger(`Retrieved ${deploymentNames.length} model deployments`, 'Status');
     return deploymentNames;
   } catch (error) {
     console.error('Error in getDynamicModelList function:', error);
+    logger('Falling back to default models from config', 'Status');
     return config.models;
   }
 }
@@ -92,27 +90,22 @@ const mapToResponse = (
   outputs: Array<Completions>,
   model: string,
 ): ConnectorResponse => {
-  const map = {
-    error: (output: ErrorCompletion): Completion => ({
-      Content: null,
-      TokenUsage: undefined,
-      Error: output.error,
-    }),
-    success: (output: ChatCompletions): Completion => ({
-      Content: output.choices[0]?.message?.content as string,
-      TokenUsage: output.usage?.totalTokens,
-    }),
-  };
-
   return {
     Completions: outputs.map((output) => {
-      if (isError(output)) {
-        return map['error'](output);
+      if ('error' in output) {
+        return {
+          Content: null,
+          TokenUsage: undefined,
+          Error: output.error
+        };
+      } else {
+        return {
+          Content: output.choices[0]?.message?.content,
+          TokenUsage: output.usage?.total_tokens
+        };
       }
-
-      return map['success'](output);
     }),
-    ModelType: model,
+    ModelType: outputs[0]?.model || model,
   };
 };
 
@@ -151,93 +144,75 @@ async function main(
   const azureApiKey = settings?.[AZURE_API_KEY] as string;
   const deploymentId = model;
 
-  const client = new OpenAIClient(
-    endpoint,
-    new AzureKeyCredential(azureApiKey),
-  );
+  const client = new AzureOpenAI({
+    apiKey: azureApiKey,
+    endpoint: endpoint,
+    deployment: deploymentId,
+    apiVersion: "2024-08-01-preview",
+  });
 
   const total = prompts.length;
   const { prompt, ...restProperties } = properties;
   const systemPrompt = (prompt ||
-    config.properties.find((prop) => prop.id === 'prompt')?.value) as string;
-  const messageHistory: (
-    | ChatRequestMessageUnion
-    | ChatRequestUserMessage
-    | ChatRequestAssistantMessage
-  )[] = [{ role: 'system', content: systemPrompt }];
+    config.properties.find((prop: { id: string }) => prop.id === 'prompt')?.value) as string;
+  const messageHistory: ChatCompletionMessageParam[] = [
+    { role: 'system', content: systemPrompt }
+  ];
 
   const outputs: Array<Completions> = [];
 
-  const getChatCompletions = async (
-    messageContent: ChatRequestMessageUnion[],
-  ): Promise<Completions[]> => {
-    try {
-      const chatCompletion = await client.getChatCompletions(
-        deploymentId,
-        messageContent,
-        restProperties,
-      );
-      outputs.push(chatCompletion);
-    } catch (error) {
-      const completionWithError = mapErrorToCompletion(error, model);
-      outputs.push(completionWithError);
-    }
-
-    return outputs;
-  };
-
   try {
     for (let index = 0; index < total; index++) {
-      const userPrompt = prompts[index];
-      logger(userPrompt);
-      const imageUrls = extractImageUrls(userPrompt);
+      try {
+        const userPrompt = prompts[index];
+        logger(userPrompt);
+        const imageUrls = extractImageUrls(userPrompt);
 
-      const messageContent: Array<
-        ChatMessageTextContentItem | ChatMessageImageContentItem
-      > = [
-        {
+        const content: { type: 'text', text: string }[] = [{
           type: 'text',
-          text: userPrompt,
-        },
-      ];
+          text: userPrompt
+        }];
 
-      for (const imageUrl of imageUrls) {
-        if (imageUrl.startsWith('http')) {
-          messageContent.push({
-            type: 'image_url',
-            imageUrl: {
-              url: imageUrl,
-            },
-          });
-        } else {
-          const base64Image = encodeImage(imageUrl);
-          messageContent.push({
-            type: 'image_url',
-            imageUrl: {
-              url: `data:image/jpeg;base64,${base64Image}`,
-            },
-          });
+        for (const imageUrl of imageUrls) {
+          if (imageUrl.startsWith('http')) {
+            content.push({
+              type: 'text',
+              text: imageUrl
+            });
+          } else {
+            const base64Image = encodeImage(imageUrl);
+            content.push({
+              type: 'text',
+              text: `data:image/jpeg;base64,${base64Image}`
+            });
+          }
         }
+
+        messageHistory.push({ role: 'user', content: userPrompt });
+        logger(messageHistory);
+
+        const chatCompletion = await client.chat.completions.create({
+          messages: messageHistory,
+          model: deploymentId,
+          ...restProperties,
+        });
+        logger(chatCompletion);
+
+        outputs.push(chatCompletion);
+        const assistantResponse =
+          chatCompletion.choices[0]?.message?.content || 'No response.';
+
+        messageHistory.push({
+          role: 'assistant',
+          content: assistantResponse,
+        });
+
+        logger(chatCompletion, `Response to prompt ${index + 1} of ${total}:`);
+      } catch (error) {
+        const completionWithError = mapErrorToCompletion(error, model);
+        outputs.push(completionWithError);
+        logger('Error in chat completion:', error);
       }
-
-      messageHistory.push({ role: 'user', content: messageContent });
-      logger(messageHistory);
-
-      const chatCompletion = (await getChatCompletions(
-        messageHistory,
-      )) as ChatCompletions[];
-      logger(chatCompletion);
-
-      outputs.push(chatCompletion[0]);
-      const assistantResponse =
-        chatCompletion[0].choices[0]?.message?.content || 'No response.';
-
-      messageHistory.push({
-        role: 'assistant',
-        content: assistantResponse,
-      });
-
-      logger(chatCompletion, `Response to prompt ${index + 1} of ${total}:`);
     }
 
     return mapToResponse(outputs, model);
