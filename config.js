@@ -1,6 +1,6 @@
 export const config = {
   connectorName: 'Azure OpenAI Connector',
-  connectorVersion: '1.0.1',
+  connectorVersion: '1.0.3',
   models: [],
   description:
     'The Azure OpenAI Connector utilizes the capabilities of sophisticated AI models offered by OpenAI, like GPT.',
