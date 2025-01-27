@@ -1,12 +1,14 @@
+import axios from 'axios';
 import { AzureOpenAI } from 'openai';
-import type { ChatCompletion, ChatCompletionMessageParam } from 'openai/resources';
+import type {
+  ChatCompletion,
+  ChatCompletionMessageParam,
+} from 'openai/resources';
 
 import * as fs from 'node:fs';
 import * as utils from 'node:util';
 
 import { config } from './config.js';
-import { DefaultAzureCredential } from '@azure/identity';
-import { CognitiveServicesManagementClient } from '@azure/arm-cognitiveservices';
 
 const AZURE_API_KEY = 'AZURE_API_KEY';
 const ENDPOINT = 'ENDPOINT';
@@ -42,36 +44,38 @@ export interface ConnectorSetting {
   Type: string;
 }
 
+interface Deployment {
+  model: string;
+}
+
+function normalizeUrl(url: string): string {
+  return url.endsWith('/') ? url.slice(0, -1) : url;
+}
+
 async function getDynamicModelList(
   settings: ConnectorSetting[],
 ): Promise<string[]> {
-  const accountName = settings.find((x) => x.SettingID === 'ACCOUNT_NAME')
+  const apiKey = settings.find((x) => x.SettingID === AZURE_API_KEY)
     ?.Value as string;
-  const resourceGroupName = settings.find(
-    (x) => x.SettingID === 'RESOURCE_GROUPNAME',
-  )?.Value as string;
-  const subscriptionId = settings.find((x) => x.SettingID === 'SUBSCRIPTION_ID')
+  const endpoint = settings.find((x) => x.SettingID === ENDPOINT)
     ?.Value as string;
-
-  const credential = new DefaultAzureCredential();
-  const client = new CognitiveServicesManagementClient(
-    credential,
-    subscriptionId,
-  );
-  const deploymentNames = [];
+  let deploymentNames = [];
 
   try {
     logger('Fetching available models...', 'Status');
-    for await (const item of client.deployments.list(
-      resourceGroupName,
-      accountName,
-    )) {
-      if (item?.name) {
-        deploymentNames.push(item.name);
-        logger(`Found model deployment: ${item.name}`, 'Status');
-      }
-    }
+    const normalizedEndpoint = normalizeUrl(endpoint);
+    const response = await axios.get(
+      `${normalizedEndpoint}/openai/deployments?api-version=2023-03-15-preview`,
+      {
+        headers: {
+          'API-Key': apiKey,
+        },
+      },
+    );
 
+    deploymentNames =
+      response?.data?.data?.map((deployment: Deployment) => deployment.model) ??
+      [];
     logger(`Retrieved ${deploymentNames.length} model deployments`, 'Status');
     return deploymentNames;
   } catch (error) {
@@ -79,11 +83,6 @@ async function getDynamicModelList(
     logger('Falling back to default models from config', 'Status');
     return config.models;
   }
-}
-
-// eslint-disable-next-line @typescript-eslint/no-explicit-any
-function isError(output: any): output is ErrorCompletion {
-  return (output as ErrorCompletion).error !== undefined;
 }
 
 const mapToResponse = (
@@ -96,12 +95,12 @@ const mapToResponse = (
         return {
           Content: null,
           TokenUsage: undefined,
-          Error: output.error
+          Error: output.error,
         };
       } else {
         return {
           Content: output.choices[0]?.message?.content,
-          TokenUsage: output.usage?.total_tokens
+          TokenUsage: output.usage?.total_tokens,
         };
       }
     }),
@@ -148,15 +147,16 @@ async function main(
     apiKey: azureApiKey,
     endpoint: endpoint,
     deployment: deploymentId,
-    apiVersion: "2024-08-01-preview",
+    apiVersion: '2024-08-01-preview',
   });
 
   const total = prompts.length;
   const { prompt, ...restProperties } = properties;
   const systemPrompt = (prompt ||
-    config.properties.find((prop: { id: string }) => prop.id === 'prompt')?.value) as string;
+    config.properties.find((prop: { id: string }) => prop.id === 'prompt')
+      ?.value) as string;
   const messageHistory: ChatCompletionMessageParam[] = [
-    { role: 'system', content: systemPrompt }
+    { role: 'system', content: systemPrompt },
   ];
 
   const outputs: Array<Completions> = [];
@@ -168,22 +168,24 @@ async function main(
         logger(userPrompt);
         const imageUrls = extractImageUrls(userPrompt);
 
-        const content: { type: 'text', text: string }[] = [{
-          type: 'text',
-          text: userPrompt
-        }];
+        const content: { type: 'text'; text: string }[] = [
+          {
+            type: 'text',
+            text: userPrompt,
+          },
+        ];
 
         for (const imageUrl of imageUrls) {
           if (imageUrl.startsWith('http')) {
             content.push({
               type: 'text',
-              text: imageUrl
+              text: imageUrl,
             });
           } else {
             const base64Image = encodeImage(imageUrl);
             content.push({
               type: 'text',
-              text: `data:image/jpeg;base64,${base64Image}`
+              text: `data:image/jpeg;base64,${base64Image}`,
             });
           }
         }
