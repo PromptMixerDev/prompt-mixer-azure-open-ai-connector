@@ -29,7 +29,7 @@
     "openai": "^4.82.0"
   },
   "devDependencies": {
-    "@types/node": "^22.12.0",
+    "@types/node": "^22.13.0",
     "@typescript-eslint/eslint-plugin": "^8.19.1",
     "@typescript-eslint/parser": "^8.20.0",
     "eslint": "9.19.0",
