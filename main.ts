@@ -147,7 +147,7 @@ async function main(
     apiKey: azureApiKey,
     endpoint: endpoint,
     deployment: deploymentId,
-    apiVersion: '2024-08-01-preview',
+    apiVersion: '2024-12-01-preview',
   });
 
   const total = prompts.length;

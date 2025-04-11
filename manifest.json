@@ -1,7 +1,7 @@
 {
   "id": "prompt-mixer-azure-open-ai",
   "name": "Azure OpenAI Connector",
-  "version": "1.0.3",
+  "version": "1.0.4",
   "minAppVersion": "0.1.0",
   "description": "Azure OpenAI Connector leverage the power of advanced AI models provided by OpenAI",
   "author": "Prompt Mixer",
