@@ -22,7 +22,7 @@
   "dependencies": {
     "@azure/openai": "^2.0.0",
     "axios": "^1.8.4",
-    "builtin-modules": "^4.0.0",
+    "builtin-modules": "^5.0.0",
     "esbuild": "^0.25.2",
     "fs": "^0.0.1-security",
     "openai": "^4.91.1"
