@@ -23,7 +23,7 @@
     "@azure/openai": "^2.0.0",
     "axios": "^1.12.2",
     "builtin-modules": "^5.0.0",
-    "esbuild": "^0.25.9",
+    "esbuild": "^0.25.10",
     "fs": "^0.0.1-security",
     "openai": "^5.23.1"
   },
